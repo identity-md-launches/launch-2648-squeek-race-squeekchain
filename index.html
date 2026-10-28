@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Squeek Race · Squeekchain 链上算力仓鼠赛跑</title>
+<meta name="description" content="把 Squeekchain 的链上算力变成一场实时仓鼠赛跑：区块进度、累计 work、24 小时柱状图和今日排行榜，每 10 秒刷新。">
+<meta name="theme-color" content="#ffffff">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Squeek Race · Squeekchain 链上算力仓鼠赛跑">
+<meta property="og:description" content="Squeekchain 的链上算力实时变成一场仓鼠赛跑，每 10 秒刷新。">
+<meta property="og:image" content="./og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23b23a24' stroke-width='3'/%3E%3Cpath d='M16 3v26M3 16h26M6.8 6.8l18.4 18.4M25.2 6.8 6.8 25.2' stroke='%23b23a24' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23111'/%3E%3C/svg%3E">
+<style>
+  /* ---------- Tokens ---------- */
+  :root {
+    --color-bg: #ffffff;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f7f4f1;
+    --color-text: #111111;
+    --color-text-secondary: #5f5852;
+    --color-border: #e6e0da;
+    --color-border-strong: #cfc6be;
+    --color-accent: #b23a24;
+    --color-accent-strong: #8f2e1c;
+    --color-accent-soft: #fbefea;
+    --color-focus: #b23a24;
+    --color-gold: #f0c75e;
+    --color-gold-text: #3d2a00;
+    --color-silver: #d3d6da;
+    --color-silver-text: #222222;
+    --color-bronze: #dca07a;
+    --color-bronze-text: #2b1406;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", Roboto, sans-serif;
+    --text-caption: 0.75rem;   /* 12px */
+    --text-small: 0.875rem;    /* 14px */
+    --text-body: 1rem;         /* 16px */
+    --text-title: 1.25rem;     /* 20px */
+    --text-stat: 1.75rem;      /* 28px */
+    --text-display: 2.5rem;    /* 40px */
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --space-6: 32px;
+
+    --radius-card: 14px;
+    --radius-inner: 8px;
+    --radius-pill: 999px;
+    --ease-out: cubic-bezier(0.2, 0, 0, 1);
+    --page-max: 1200px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+  }
+  h1, h2, p { margin: 0; }
+  h1, h2 { line-height: 1.1; text-wrap: balance; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--color-text-secondary); }
+  .visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .skip-link { position: absolute; inset-inline-start: var(--space-4); top: -48px; background: var(--color-text); color: var(--color-bg); padding: var(--space-2) var(--space-3); border-radius: var(--radius-inner); z-index: 10; }
+  .skip-link:focus-visible { top: var(--space-2); }
+
+  .wrap { max-width: var(--page-max); margin: 0 auto; padding-inline: var(--space-4); }
+
+  /* ---------- Header ---------- */
+  .topbar { border-bottom: 1px solid var(--color-border); }
+  .topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 60px; flex-wrap: wrap; padding-block: var(--space-2); }
+  .brand { display: flex; align-items: center; gap: var(--space-2); }
+  .brand h1 { font-size: var(--text-title); font-weight: 700; letter-spacing: -0.01em; }
+  .brand svg { width: 28px; height: 28px; flex: none; }
+  .live { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-small); }
+  .live-badge { display: inline-flex; align-items: center; gap: var(--space-2); font-weight: 700; white-space: nowrap; }
+  .live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-border-strong); flex: none; }
+  .live[data-state="live"] .live-dot { background: var(--color-accent); }
+  .live[data-state="live"] .live-label { color: var(--color-accent); }
+  .refresh {
+    min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-strong); background: var(--color-surface);
+    cursor: pointer; white-space: nowrap; font-size: var(--text-small); font-weight: 600;
+    transition-property: background-color, scale; transition-duration: 150ms; transition-timing-function: var(--ease-out);
+  }
+  @media (hover: hover) { .refresh:hover { background: var(--color-surface-muted); } }
+  .refresh:active { scale: 0.96; }
+  .refresh[aria-busy="true"] { color: var(--color-text-secondary); }
+
+  /* ---------- Alert ---------- */
+  .alert { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-inner); background: var(--color-accent-soft); color: var(--color-accent-strong); font-weight: 600; border: 1px solid var(--color-accent); }
+  .alert:empty { display: none; }
+
+  /* ---------- Intro + stats ---------- */
+  main { padding-block: var(--space-4) var(--space-6); }
+  .intro { margin-top: var(--space-4); color: var(--color-text-secondary); text-wrap: pretty; max-width: 60ch; }
+  .stats { display: grid; gap: var(--space-3); margin-top: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: var(--space-4);
+    min-width: 0;
+  }
+  .stat-label { font-size: var(--text-small); color: var(--color-text-secondary); }
+  .stat-value { font-size: var(--text-stat); font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+  .stat-label .stat-value { color: var(--color-text); }
+  .stat-meta { font-size: var(--text-small); color: var(--color-text-secondary); margin-top: var(--space-1); }
+  .stat-block { display: flex; flex-direction: column; justify-content: center; }
+  .block-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+  .progress { margin-top: var(--space-3); height: 10px; border-radius: var(--radius-pill); background: var(--color-surface-muted); border: 1px solid var(--color-border); overflow: hidden; }
+  .progress-fill { height: 100%; width: 100%; background: var(--color-accent); transform-origin: left center; transform: scaleX(0); transition: transform 600ms var(--ease-out); }
+  .work-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-1); }
+  .spin { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-small); }
+  .spin p { display: grid; text-align: end; line-height: 1.3; }
+  .spin-rpm { font-weight: 700; white-space: nowrap; }
+  .spin-status { color: var(--color-text-secondary); white-space: nowrap; }
+  .wheel { width: 40px; height: 40px; flex: none; color: var(--color-accent); }
+  .wheel-rotor { transform-origin: 50% 50%; transform-box: fill-box; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .wheel[data-spinning="true"] .wheel-rotor { animation: spin var(--spin-duration, 2s) linear infinite; }
+    .live[data-state="live"] .live-dot { animation: pulse 2s var(--ease-out) infinite; }
+    .runner[data-moving="true"] .runner-body { animation: hop 420ms ease-in-out infinite alternate; }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgb(178 58 36 / 0.45); } 100% { box-shadow: 0 0 0 8px rgb(178 58 36 / 0); } }
+  @keyframes hop { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+
+  /* ---------- Main grid ---------- */
+  .grid { display: grid; gap: var(--space-4); margin-top: var(--space-4); grid-template-columns: minmax(0, 1fr); }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-3); }
+  .card-head h2 { font-size: var(--text-title); font-weight: 700; }
+  .card-note { font-size: var(--text-small); color: var(--color-text-secondary); }
+
+  /* Race track */
+  .track { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+  .lane { display: grid; grid-template-columns: 3.5em minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+  .lane-name { font-size: var(--text-small); font-weight: 600; white-space: nowrap; }
+  .lane-track {
+    position: relative; height: 44px; border-radius: var(--radius-inner);
+    background: var(--color-surface-muted);
+    background-image: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), var(--color-border) calc(10% - 1px) 10%);
+  }
+  .lane-track::after {
+    content: ""; position: absolute; inset-block: 0; inset-inline-end: 0; width: 8px; border-radius: 0 var(--radius-inner) var(--radius-inner) 0;
+    background: repeating-conic-gradient(var(--color-text) 0 25%, var(--color-bg) 0 50%) 0 0 / 8px 8px;
+  }
+  .runner {
+    position: absolute; top: 4px; left: 0; width: 36px; height: 36px;
+    transform: translateX(var(--x, 0px));
+    transition: transform 1200ms var(--ease-out);
+    will-change: transform;
+  }
+  .runner svg { width: 36px; height: 36px; display: block; filter: drop-shadow(0 1px 1.5px rgb(17 17 17 / 0.25)); }
+  .race-foot { margin-top: var(--space-3); font-size: var(--text-small); color: var(--color-text-secondary); text-wrap: pretty; }
+
+  /* Leaderboard */
+  .board-table { width: 100%; border-collapse: collapse; font-size: var(--text-small); }
+  .board-table th { text-align: start; font-weight: 600; color: var(--color-text-secondary); padding: 0 var(--space-2) var(--space-2); }
+  .board-table td { padding: var(--space-2); border-top: 1px solid var(--color-border); vertical-align: middle; }
+  .board-table th:first-child, .board-table td:first-child { padding-inline-start: 0; }
+  .board-table th:last-child, .board-table td:last-child { padding-inline-end: 0; text-align: end; }
+  .board-table .col-work { text-align: end; }
+  .rank { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font-weight: 700; background: var(--color-surface-muted); }
+  .rank-1 { background: var(--color-gold); color: var(--color-gold-text); }
+  .rank-2 { background: var(--color-silver); color: var(--color-silver-text); }
+  .rank-3 { background: var(--color-bronze); color: var(--color-bronze-text); }
+  .who { display: flex; align-items: center; gap: var(--space-2); font-weight: 600; white-space: nowrap; }
+  .who svg { width: 24px; height: 24px; flex: none; }
+  .trend { display: block; font-size: var(--text-caption); color: var(--color-text-secondary); white-space: nowrap; }
+  .trend-up { color: var(--color-accent); }
+
+  /* Chart */
+  .chart-box { position: relative; height: 200px; }
+  .chart-box canvas { display: block; width: 100%; height: 100%; border-radius: var(--radius-inner); cursor: crosshair; }
+  .chart-caption { margin-top: var(--space-2); font-size: var(--text-small); min-height: 1.5em; }
+  .chart-hint { font-size: var(--text-caption); color: var(--color-text-secondary); }
+
+  /* Settlement list */
+  .settle-list { list-style: none; margin: 0; padding: 0; }
+  .settle-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-3); padding-block: var(--space-3); border-top: 1px solid var(--color-border); }
+  .settle-list li:first-child { border-top: 0; padding-top: 0; }
+  .settle-main { font-weight: 600; overflow-wrap: anywhere; }
+  .settle-sub { font-size: var(--text-small); color: var(--color-text-secondary); }
+  .settle-time { font-size: var(--text-small); color: var(--color-text-secondary); white-space: nowrap; text-align: end; }
+  .empty { color: var(--color-text-secondary); font-size: var(--text-small); }
+  .summary-line { margin-top: var(--space-3); font-size: var(--text-small); color: var(--color-text-secondary); }
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-4) 0 0; padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+  .facts dt { font-size: var(--text-small); color: var(--color-text-secondary); }
+  .facts dd { margin: 0; font-size: var(--text-title); font-weight: 700; overflow-wrap: anywhere; }
+
+  /* Footer */
+  footer { border-top: 1px solid var(--color-border); font-size: var(--text-small); color: var(--color-text-secondary); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2) var(--space-4); padding-block: var(--space-5); }
+  footer a { color: var(--color-text); text-underline-position: from-font; }
+  .credit { color: var(--color-text); font-weight: 600; }
+
+  /* ---------- Desktop: two columns ---------- */
+  @media (min-width: 52rem) {
+    .stats { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .grid { grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); grid-template-areas: "race board" "chart settle"; align-items: start; }
+    .race { grid-area: race; }
+    .board { grid-area: board; }
+    .chart { grid-area: chart; }
+    .settle { grid-area: settle; }
+    .lane-track { height: 52px; }
+    .runner { top: 6px; width: 40px; height: 40px; }
+    .runner svg { width: 40px; height: 40px; }
+    .chart-box { height: 240px; }
+  }
+  @media (min-width: 72rem) {
+    .stat-work .stat-value { font-size: var(--text-display); }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#race">跳到赛道</a>
+
+<!-- Hamster artwork, reused by every runner and the leaderboard. Body colour comes from currentColor. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="hamster" viewBox="0 0 40 40">
+    <ellipse cx="19" cy="23" rx="14" ry="11" fill="currentColor"/>
+    <ellipse cx="17" cy="26" rx="8" ry="6" fill="#fff" opacity="0.55"/>
+    <circle cx="29" cy="15" r="4" fill="currentColor"/>
+    <circle cx="29" cy="15" r="2" fill="#f2b8a8"/>
+    <circle cx="31" cy="21" r="1.8" fill="#111"/>
+    <circle cx="35.5" cy="24" r="1.4" fill="#e58a7a"/>
+    <path d="M12 33v3M24 33v3" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+    <path d="M5.5 21q-3 1-2 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#b23a24" stroke-width="3"/><path d="M16 3v26M3 16h26M6.8 6.8l18.4 18.4M25.2 6.8 6.8 25.2" stroke="#b23a24" stroke-width="1.5"/><circle cx="16" cy="16" r="5" fill="#111"/></svg>
+      <h1>Squeek Race</h1>
+    </div>
+    <div class="live" id="live" data-state="loading">
+      <span class="live-badge"><span class="live-dot" aria-hidden="true"></span><span class="live-label" id="live-label">连接中</span></span>
+      <button type="button" class="refresh" id="refresh">立即刷新</button>
+    </div>
+  </div>
+</header>
+
+<main id="main" class="wrap">
+  <div class="alert" id="alert" role="alert"></div>
+
+  <p class="intro">Squeekchain 的链上算力实时变成一场仓鼠赛跑。<span class="num" id="updated">正在拉取数据</span>，每 10 秒刷新。</p>
+
+  <section class="stats" aria-label="链上实时数据">
+    <div class="card stat-block">
+      <div class="block-head">
+        <p class="stat-label">当前区块 <span class="stat-value num" id="block-height">…</span></p>
+        <p class="stat-label">完成度 <strong class="num" id="block-pct">…</strong></p>
+      </div>
+      <div class="progress" id="block-progress" role="progressbar" aria-label="当前区块完成度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-fill" id="block-fill"></div>
+      </div>
+    </div>
+    <div class="card stat-work">
+      <div class="work-head">
+        <p class="stat-label">累计 work</p>
+        <div class="spin">
+          <p><span class="spin-rpm num" id="rpm">…</span><span class="spin-status" id="core-status">…</span></p>
+          <svg class="wheel" id="wheel" viewBox="0 0 52 52" aria-hidden="true" data-spinning="false">
+            <g class="wheel-rotor">
+              <circle cx="26" cy="26" r="23" fill="none" stroke="currentColor" stroke-width="3"/>
+              <path d="M26 3v46M3 26h46M9.7 9.7l32.6 32.6M42.3 9.7 9.7 42.3" stroke="currentColor" stroke-width="1.25"/>
+            </g>
+            <circle cx="26" cy="26" r="4" fill="#111"/>
+          </svg>
+        </div>
+      </div>
+      <p class="stat-value num" id="work-total">…</p>
+      <p class="stat-meta num"><span id="work-delta">打开页面后新增 0</span> · <span id="speed">…</span></p>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card race" id="race" aria-labelledby="race-title" tabindex="-1">
+      <div class="card-head">
+        <h2 id="race-title">赛道</h2>
+        <p class="card-note num" id="race-note">24 小时 work 份额</p>
+      </div>
+      <ol class="track" id="track" aria-label="跑者位置"></ol>
+      <p class="race-foot">跑者是虚构的：每个小时桶的 workAdded 按随机权重分给 5 只仓鼠，当前小时每次刷新重新分配，所以名次会变。</p>
+    </section>
+
+    <section class="card board" aria-labelledby="board-title">
+      <div class="card-head">
+        <h2 id="board-title">今日排行榜</h2>
+        <p class="card-note">近 24 小时</p>
+      </div>
+      <table class="board-table">
+        <thead>
+          <tr><th scope="col">名次</th><th scope="col">跑者</th><th scope="col" class="col-work">work</th><th scope="col">增速</th></tr>
+        </thead>
+        <tbody id="board"><tr><td colspan="4" class="empty">正在拉取 24 小时数据</td></tr></tbody>
+      </table>
+    </section>
+
+    <section class="card chart" aria-labelledby="chart-title">
+      <div class="card-head">
+        <h2 id="chart-title">24 小时 work</h2>
+        <p class="card-note num" id="chart-total">…</p>
+      </div>
+      <div class="chart-box">
+        <canvas id="chart" tabindex="0" role="img" aria-label="24 小时每小时 workAdded 柱状图" aria-describedby="chart-caption"></canvas>
+      </div>
+      <p class="chart-caption num" id="chart-caption" aria-live="polite"></p>
+      <p class="chart-hint">悬停或用左右方向键查看每小时数值。</p>
+    </section>
+
+    <section class="card settle" aria-labelledby="settle-title">
+      <div class="card-head">
+        <h2 id="settle-title">最近结算</h2>
+        <p class="card-note num" id="settle-count">…</p>
+      </div>
+      <ul class="settle-list" id="settle-list"><li class="empty">正在拉取结算记录</li></ul>
+      <p class="summary-line num" id="settle-summary"></p>
+      <dl class="facts">
+        <div><dt>已铸造 SQK</dt><dd class="num" id="sqk-minted">…</dd></div>
+        <div><dt>已处理轮次</dt><dd class="num" id="round">…</dd></div>
+      </dl>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>数据来源：<a href="https://api.squeekchain.com/v1/status">api.squeekchain.com</a>，只读，不接钱包，不发交易。</p>
+    <p>作者 <span class="credit">@Despite_zmw</span></p>
+  </div>
+</footer>
+
+<script>
+// @ts-check
+"use strict";
+
+/* ===================================================================
+ * 数据源（全部是公开、带 CORS 的 GET 接口）
+ *   STATUS      https://api.squeekchain.com/v1/status
+ *   SETTLEMENTS https://api.squeekchain.com/v1/settlements?range=24h
+ *   ECONOMY     https://api.squeekchain.com/v1/economy/state
+ * =================================================================== */
+const API_BASE = "https://api.squeekchain.com/v1";
+const ENDPOINTS = {
+  status: API_BASE + "/status",
+  settlements: API_BASE + "/settlements?range=24h",
+  economy: API_BASE + "/economy/state",
+};
+const REFRESH_MS = 10000;   // 每 10 秒自动刷新
+const TIMEOUT_MS = 8000;    // 单次请求超时，保证 10 秒内一定出结果或降级
+const FAIL_TEXT = "数据拉取失败，10 秒后重试";
+
+/** 虚构跑者：名字和毛色只用于展示，work 来自链上数据的随机拆分。 */
+const RUNNERS = [
+  { id: "doubao", name: "豆包", color: "#c8873e" },
+  { id: "zhima", name: "芝麻", color: "#4a4440" },
+  { id: "tuanzi", name: "团子", color: "#e3b98a" },
+  { id: "naitang", name: "奶糖", color: "#d9cfc4" },
+  { id: "huajuan", name: "花卷", color: "#9b5a3c" },
+];
+
+/* ---------- 格式化 ---------- */
+const intFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const decFmt = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** 千分位整数。接受 number、整数字符串或 bigint（大数不丢精度）。 */
+function fmtInt(v) {
+  if (v === null || v === undefined || v === "") return "-";
+  if (typeof v === "bigint") return intFmt.format(v);
+  if (typeof v === "string" && /^-?\d+$/.test(v.trim())) return intFmt.format(BigInt(v.trim()));
+  const n = Number(v);
+  return Number.isFinite(n) ? intFmt.format(Math.round(n)) : "-";
+}
+
+/** 两位小数并加千分位。 */
+function fmtDec(n) {
+  return Number.isFinite(n) ? decFmt.format(n) : "-";
+}
+
+/** 把字符串/数字转成 BigInt，失败返回 null。 */
+function toBig(v) {
+  try {
+    if (typeof v === "bigint") return v;
+    if (typeof v === "number" && Number.isFinite(v)) return BigInt(Math.trunc(v));
+    if (typeof v === "string" && /^-?\d+$/.test(v.trim())) return BigInt(v.trim());
+  } catch (_) { /* ignore */ }
+  return null;
+}
+
+/** 数字字段：number 或数字字符串，失败返回 null。 */
+function toNum(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 时间值（ISO 字符串、秒或毫秒）转毫秒时间戳。 */
+function toMs(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  if (Number.isFinite(n)) return n < 1e12 ? n * 1000 : n;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) ? t : null;
+}
+
+/** 「x 分钟前」相对时间。 */
+function ago(ms) {
+  if (ms === null) return "-";
+  const s = Math.max(0, (Date.now() - ms) / 1000);
+  if (s < 60) return "刚刚";
+  const m = Math.floor(s / 60);
+  if (m < 60) return m + " 分钟前";
+  const h = Math.floor(m / 60);
+  if (h < 24) return h + " 小时前";
+  return Math.floor(h / 24) + " 天前";
+}
+
+/** HH:00 本地时间标签。 */
+function hourLabel(ms) {
+  const d = new Date(ms);
+  return String(d.getHours()).padStart(2, "0") + ":00";
+}
+
+/* ---------- 网络 ---------- */
+/** @param {string} url */
+async function getJson(url) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: ctrl.signal, headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/* ---------- 解析：每个字段写清楚来自哪个接口、哪个路径 ---------- */
+
+/** /v1/status */
+function parseStatus(raw) {
+  const m = (raw && raw.measurement) || {};
+  const anchor = (raw && raw.builder && raw.builder.anchor) || {};
+  return {
+    // /v1/status → measurement.cumulativeWorkUnits：累计 work（大整数字符串）
+    cumulativeWork: toBig(m.cumulativeWorkUnits),
+    // /v1/status → measurement.rpmMilli：转速，千分之一 rpm
+    rpm: toNum(m.rpmMilli) === null ? null : /** @type {number} */ (toNum(m.rpmMilli)) / 1000,
+    // /v1/status → measurement.speedMmPerSecond：线速度 mm/s
+    speed: toNum(m.speedMmPerSecond),
+    // /v1/status → measurement.coreStatus：SPINNING / IDLE
+    coreStatus: typeof m.coreStatus === "string" ? m.coreStatus : null,
+    // /v1/status → measurement.receivedAt：最近一次测量被接受的时间（可选）
+    receivedAt: toMs(m.receivedAt),
+    // /v1/status → builder.anchor.blockHeight：当前区块高度
+    blockHeight: toBig(anchor.blockHeight),
+    // /v1/status → builder.anchor.blockProgress：当前区块完成度，0 ~ 1e9
+    blockProgress: toNum(anchor.blockProgress),
+  };
+}
+
+/** 一个小时桶的开始时间：接口没有固定字段名时依次尝试常见写法。 */
+function bucketTime(b) {
+  if (!b || typeof b !== "object") return null;
+  const keys = ["startsAt", "start", "bucketStart", "startTime", "hourStart", "from", "timestamp", "time", "at", "hour"];
+  for (const k of keys) {
+    const t = toMs(b[k]);
+    if (t !== null && t > 1e11) return t;
+  }
+  return null;
+}
+
+/** /v1/settlements?range=24h */
+function parseSettlements(raw) {
+  // /v1/settlements → buckets[]：24 个小时桶
+  const rawBuckets = Array.isArray(raw && raw.buckets) ? raw.buckets : [];
+  let buckets = rawBuckets.map((b, i) => ({
+    index: i,
+    time: bucketTime(b),
+    // buckets[].workAdded：该小时新增 work
+    workAdded: toNum(b && b.workAdded) || 0,
+    // buckets[].settlementCount：该小时结算次数
+    settlementCount: toNum(b && b.settlementCount) || 0,
+    // buckets[].completedBlockCount：该小时完成的区块数
+    completedBlockCount: toNum(b && b.completedBlockCount) || 0,
+  }));
+  if (buckets.every((b) => b.time !== null)) {
+    buckets.sort((a, b) => /** @type {number} */ (a.time) - /** @type {number} */ (b.time));
+  } else {
+    // 没有时间字段时按接口顺序（旧 → 新）推算每个桶的整点时间
+    const hour = 3600000;
+    const now = Math.floor(Date.now() / hour) * hour;
+    buckets = buckets.map((b, i) => ({ ...b, time: now - (buckets.length - 1 - i) * hour }));
+  }
+  const summary = (raw && raw.summary) || {};
+  // 接口如果附带逐条结算记录，就用它做「最近结算」；常见字段名依次尝试
+  const listKey = ["settlements", "recent", "items", "events", "latest"].find((k) => Array.isArray(raw && raw[k]));
+  const recent = listKey ? raw[listKey].map(parseSettlementItem).filter(Boolean) : [];
+  return {
+    buckets,
+    // /v1/settlements → summary.settlementCount：24h 结算总次数
+    settlementCount: toNum(summary.settlementCount),
+    // /v1/settlements → summary.workAdded：24h 新增 work 总量
+    workAdded: summary.workAdded,
+    recent,
+  };
+}
+
+/** /v1/settlements 逐条记录（可选字段）。 */
+function parseSettlementItem(it) {
+  if (!it || typeof it !== "object") return null;
+  const time = toMs(it.settledAt ?? it.createdAt ?? it.blockTimestamp ?? it.timestamp ?? it.time ?? it.at);
+  return {
+    time,
+    work: it.workAdded ?? it.work ?? it.workUnits ?? null,
+    round: it.settledThroughRound ?? it.round ?? it.roundId ?? null,
+    blocks: toNum(it.completedBlockCount ?? it.blocks),
+    tx: typeof (it.transactionHash ?? it.txHash) === "string" ? (it.transactionHash ?? it.txHash) : null,
+  };
+}
+
+/** /v1/economy/state */
+function parseEconomy(raw) {
+  const supply = (raw && raw.supply) || {};
+  const mining = (raw && raw.mining) || {};
+  return {
+    // /v1/economy/state → supply.totalMintedBaseUnits：已铸造总量，18 位小数
+    totalMinted: toBig(supply.totalMintedBaseUnits),
+    // /v1/economy/state → mining.processedThroughRound：已处理到的轮次
+    processedThroughRound: mining.processedThroughRound ?? null,
+  };
+}
+
+/** base units（18 位小数）转 SQK，保留两位小数，全程 BigInt。 */
+function fmtSqk(base) {
+  if (base === null) return "-";
+  const unit = 10n ** 18n;
+  const whole = base / unit;
+  const cents = (base % unit) / 10n ** 16n;
+  return intFmt.format(whole) + "." + String(cents).padStart(2, "0");
+}
+
+/* ---------- 随机分配：把每小时 workAdded 拆给跑者 ---------- */
+function hashString(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+/**
+ * 每只仓鼠当天有一个固定「体力」（按日期做种子），每小时再乘一个随机系数，
+ * 这样 24 小时累计下来份额能拉开差距，而不是全部挤在 20% 附近。
+ */
+function dailyStrength() {
+  const day = new Date().toDateString();
+  return RUNNERS.map((r) => 0.55 + mulberry32(hashString(day + r.id))() * 0.9);
+}
+/** 返回各跑者的权重，和为 1。 */
+function weights(rand) {
+  const strength = dailyStrength();
+  const w = RUNNERS.map((_, r) => strength[r] * (0.35 + rand()));
+  const sum = w.reduce((a, b) => a + b, 0);
+  return w.map((x) => x / sum);
+}
+
+/**
+ * 过去的小时桶按桶时间做种子，刷新时保持不变；最新一个小时桶（当前小时）
+ * 每次刷新换一次随机权重，跑者因此会前后移动。
+ */
+function allocate(buckets, refreshSeed) {
+  const totals = RUNNERS.map(() => 0);
+  const lastHour = RUNNERS.map(() => 0);
+  buckets.forEach((b, i) => {
+    const isLatest = i === buckets.length - 1;
+    const seed = hashString(String(b.time) + (isLatest ? ":" + refreshSeed : ""));
+    const w = weights(mulberry32(seed));
+    w.forEach((share, r) => {
+      const part = b.workAdded * share;
+      totals[r] += part;
+      if (isLatest) lastHour[r] = part;
+    });
+  });
+  return RUNNERS.map((runner, r) => ({ ...runner, work: totals[r], lastHour: lastHour[r] }));
+}
+
+/* ---------- 状态 ---------- */
+const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
+const state = {
+  status: /** @type {ReturnType<typeof parseStatus> | null} */ (null),
+  settlements: /** @type {ReturnType<typeof parseSettlements> | null} */ (null),
+  economy: /** @type {ReturnType<typeof parseEconomy> | null} */ (null),
+  firstWork: /** @type {bigint | null} */ (null),
+  lastSuccess: /** @type {number | null} */ (null),
+  failed: false,
+  refreshCount: 0,
+  prevRanks: /** @type {Record<string, number>} */ ({}),
+  standings: /** @type {Array<ReturnType<typeof allocate>[number]>} */ ([]),
+  selectedBar: -1,
+  timer: 0,
+  inFlight: false,
+};
+
+/* ---------- 渲染 ---------- */
+function renderStatus() {
+  const s = state.status;
+  if (!s) return;
+  $("block-height").textContent = s.blockHeight === null ? "-" : "#" + fmtInt(s.blockHeight);
+  if (s.blockProgress !== null) {
+    // blockProgress / 1e9 = 完成比例；百分比保留两位小数（向下取整，避免提前显示 100%）
+    const ratio = Math.min(1, Math.max(0, s.blockProgress / 1e9));
+    const pct = Math.floor(ratio * 10000) / 100;
+    $("block-pct").textContent = pct.toFixed(2) + "%";
+    $("block-fill").style.transform = "scaleX(" + ratio + ")";
+    $("block-progress").setAttribute("aria-valuenow", pct.toFixed(2));
+  } else {
+    $("block-pct").textContent = "-";
+  }
+  $("work-total").textContent = fmtInt(s.cumulativeWork);
+  if (s.cumulativeWork !== null) {
+    if (state.firstWork === null) state.firstWork = s.cumulativeWork;
+    $("work-delta").textContent = "打开页面后新增 " + fmtInt(s.cumulativeWork - state.firstWork);
+  }
+  const spinning = s.coreStatus === "SPINNING";
+  $("core-status").textContent = s.coreStatus === null ? "-" : spinning ? "转轮转动中" : s.coreStatus === "IDLE" ? "转轮空闲" : s.coreStatus;
+  $("rpm").textContent = s.rpm === null ? "-" : fmtDec(s.rpm) + " rpm";
+  $("speed").textContent = (s.speed === null ? "-" : fmtInt(s.speed)) + " mm/s" + (s.receivedAt !== null ? " · 测量于 " + ago(s.receivedAt) : "");
+  // 转轮动画周期 = 60 / rpm 秒，限制在 0.4 ~ 20 秒；IDLE 或 0 rpm 时停转
+  const wheel = $("wheel");
+  const turning = spinning && s.rpm !== null && s.rpm > 0;
+  wheel.setAttribute("data-spinning", String(turning));
+  if (turning) wheel.style.setProperty("--spin-duration", Math.min(20, Math.max(0.4, 60 / /** @type {number} */ (s.rpm))).toFixed(2) + "s");
+}
+
+function renderEconomy() {
+  const e = state.economy;
+  if (!e) return;
+  $("sqk-minted").textContent = fmtSqk(e.totalMinted);
+  $("round").textContent = "第 " + fmtInt(e.processedThroughRound) + " 轮";
+}
+
+function hamster(color, size) {
+  return '<svg viewBox="0 0 40 40" width="' + size + '" height="' + size + '" style="color:' + color + '" aria-hidden="true"><use href="#hamster"/></svg>';
+}
+
+function buildTrack() {
+  const track = $("track");
+  track.innerHTML = RUNNERS.map((r) =>
+    '<li class="lane" id="lane-' + r.id + '">' +
+      '<span class="lane-name">' + r.name + '</span>' +
+      '<div class="lane-track"><div class="runner" data-moving="false">' +
+        '<div class="runner-body">' + hamster(r.color, 36) + '</div>' +
+      '</div></div>' +
+    '</li>').join("");
+}
+
+function positionRunners() {
+  const standings = state.standings;
+  if (!standings.length) return;
+  const max = Math.max(...standings.map((s) => s.work), 1);
+  const moving = !!(state.status && state.status.coreStatus === "SPINNING");
+  standings.forEach((s) => {
+    const lane = document.getElementById("lane-" + s.id);
+    if (!lane) return;
+    const laneTrack = /** @type {HTMLElement} */ (lane.querySelector(".lane-track"));
+    const runner = /** @type {HTMLElement} */ (lane.querySelector(".runner"));
+    // 位置 = 自己的 work / 领跑者的 work，领跑者停在终点线前
+    const room = Math.max(0, laneTrack.clientWidth - runner.offsetWidth - 12);
+    const x = Math.round((s.work / max) * room);
+    runner.style.setProperty("--x", x + "px");
+    runner.setAttribute("data-moving", String(moving));
+    const share = standings.reduce((a, b) => a + b.work, 0);
+    lane.setAttribute("aria-label", s.name + "，work " + fmtInt(s.work) + "，份额 " + (share ? fmtDec((s.work / share) * 100) : "0.00") + "%");
+  });
+}
+
+function renderRace() {
+  const st = state.settlements;
+  if (!st) return;
+  const standings = allocate(st.buckets, state.refreshCount);
+  const sorted = [...standings].sort((a, b) => b.work - a.work);
+  state.standings = standings;
+  positionRunners();
+  const total = standings.reduce((a, b) => a + b.work, 0);
+  $("race-note").textContent = "24 小时共 " + fmtInt(total) + " work";
+
+  $("board").innerHTML = sorted.map((s, i) => {
+    const rank = i + 1;
+    const prev = state.prevRanks[s.id];
+    let move = "";
+    if (prev !== undefined && prev !== rank) {
+      move = prev > rank
+        ? '<span class="trend trend-up">上升 ' + (prev - rank) + ' 名</span>'
+        : '<span class="trend">下降 ' + (rank - prev) + ' 名</span>';
+    }
+    return '<tr>' +
+      '<td><span class="rank rank-' + rank + '" aria-label="第 ' + rank + ' 名">' + rank + '</span></td>' +
+      '<td><span class="who">' + hamster(s.color, 24) + s.name + '</span></td>' +
+      '<td class="col-work num">' + fmtInt(s.work) + '</td>' +
+      '<td class="num">+' + fmtInt(s.lastHour) + '/时' + move + '</td>' +
+    '</tr>';
+  }).join("");
+  state.prevRanks = Object.fromEntries(sorted.map((s, i) => [s.id, i + 1]));
+}
+
+function renderSettlements() {
+  const st = state.settlements;
+  if (!st) return;
+  const sumWork = st.workAdded ?? st.buckets.reduce((a, b) => a + b.workAdded, 0);
+  const sumCount = st.settlementCount ?? st.buckets.reduce((a, b) => a + b.settlementCount, 0);
+  const blocks = st.buckets.reduce((a, b) => a + b.completedBlockCount, 0);
+  $("chart-total").textContent = "合计 " + fmtInt(sumWork);
+  $("settle-count").textContent = "24 小时 " + fmtInt(sumCount) + " 次";
+  $("settle-summary").textContent = "24 小时新增 " + fmtInt(sumWork) + " work，完成 " + fmtInt(blocks) + " 个区块。";
+
+  const list = $("settle-list");
+  let rows = [];
+  if (st.recent.length) {
+    rows = [...st.recent]
+      .sort((a, b) => (b.time ?? 0) - (a.time ?? 0))
+      .slice(0, 6)
+      .map((it) => '<li>' +
+        '<span class="settle-main num">' + (it.round !== null ? "结算到第 " + fmtInt(it.round) + " 轮" : "结算") + '</span>' +
+        '<span class="settle-time">' + ago(it.time) + '</span>' +
+        '<span class="settle-sub num">' + (it.work !== null ? "+" + fmtInt(it.work) + " work" : "") + (it.blocks ? " · " + fmtInt(it.blocks) + " 个区块" : "") + '</span>' +
+      '</li>');
+  } else {
+    // 接口没有逐条记录时，列出有结算的小时桶（新 → 旧）
+    rows = st.buckets
+      .filter((b) => b.settlementCount > 0)
+      .slice(-6)
+      .reverse()
+      .map((b) => '<li>' +
+        '<span class="settle-main num">' + hourLabel(/** @type {number} */ (b.time)) + ' 时段 ' + fmtInt(b.settlementCount) + ' 次结算</span>' +
+        '<span class="settle-time">' + ago(/** @type {number} */ (b.time)) + '</span>' +
+        '<span class="settle-sub num">+' + fmtInt(b.workAdded) + ' work · 完成 ' + fmtInt(b.completedBlockCount) + ' 个区块</span>' +
+      '</li>');
+  }
+  list.innerHTML = rows.length ? rows.join("") : '<li class="empty">过去 24 小时没有结算。新的结算出现后会列在这里。</li>';
+  drawChart();
+}
+
+/* ---------- 柱状图（canvas 手写） ---------- */
+const chart = /** @type {HTMLCanvasElement} */ ($("chart"));
+let chartGeom = { left: 0, width: 0, barW: 0, n: 0 };
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function drawChart() {
+  const st = state.settlements;
+  const box = /** @type {HTMLElement} */ (chart.parentElement);
+  const dpr = window.devicePixelRatio || 1;
+  const w = box.clientWidth;
+  const h = box.clientHeight;
+  if (!w || !h) return;
+  chart.width = Math.round(w * dpr);
+  chart.height = Math.round(h * dpr);
+  const ctx = chart.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const text2 = cssVar("--color-text-secondary");
+  const border = cssVar("--color-border");
+  const accent = cssVar("--color-accent");
+  const accentStrong = cssVar("--color-accent-strong");
+  const muted = cssVar("--color-surface-muted");
+  ctx.font = "12px " + cssVar("--font-sans");
+
+  if (!st || !st.buckets.length) {
+    ctx.fillStyle = text2;
+    ctx.textAlign = "center";
+    ctx.fillText(st || state.failed ? "暂无数据" : "正在拉取数据", w / 2, h / 2);
+    return;
+  }
+  const buckets = st.buckets;
+  const max = Math.max(...buckets.map((b) => b.workAdded), 1);
+  const maxLabel = fmtInt(max);
+  const left = Math.ceil(ctx.measureText(maxLabel).width) + 8;
+  const top = 8;
+  const bottom = 22;
+  const plotW = w - left;
+  const plotH = h - top - bottom;
+  const n = buckets.length;
+  const slot = plotW / n;
+  const barW = Math.max(2, slot * 0.7);
+  chartGeom = { left, width: plotW, barW: slot, n };
+
+  // 网格线与 y 轴刻度
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 1;
+  ctx.fillStyle = text2;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  [0, 0.5, 1].forEach((f) => {
+    const y = Math.round(top + plotH * (1 - f)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.fillText(fmtInt(max * f), left - 6, y);
+  });
+
+  // 柱子：最新一小时用深色，选中的小时加底色
+  buckets.forEach((b, i) => {
+    const x = left + i * slot + (slot - barW) / 2;
+    if (i === state.selectedBar) {
+      ctx.fillStyle = muted;
+      ctx.fillRect(left + i * slot, top, slot, plotH);
+    }
+    const bh = Math.max(b.workAdded > 0 ? 2 : 0, (b.workAdded / max) * plotH);
+    ctx.fillStyle = i === n - 1 || i === state.selectedBar ? accentStrong : accent;
+    roundRectTop(ctx, x, top + plotH - bh, barW, bh, Math.min(4, barW / 2));
+  });
+
+  // x 轴：每 6 小时一个整点标签
+  ctx.fillStyle = text2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  buckets.forEach((b, i) => {
+    if ((n - 1 - i) % 6 !== 0) return;
+    const label = hourLabel(/** @type {number} */ (b.time));
+    const half = ctx.measureText(label).width / 2;
+    const cx = Math.min(w - half, Math.max(left + half, left + i * slot + slot / 2));
+    ctx.fillText(label, cx, top + plotH + 6);
+  });
+  updateCaption();
+}
+
+function roundRectTop(ctx, x, y, w, h, r) {
+  if (h <= 0) return;
+  r = Math.min(r, h);
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function updateCaption() {
+  const st = state.settlements;
+  if (!st || !st.buckets.length) { $("chart-caption").textContent = ""; return; }
+  const i = state.selectedBar >= 0 ? state.selectedBar : st.buckets.length - 1;
+  const b = st.buckets[i];
+  $("chart-caption").textContent = hourLabel(/** @type {number} */ (b.time)) + " 时段：+" + fmtInt(b.workAdded) + " work，" +
+    fmtInt(b.settlementCount) + " 次结算，完成 " + fmtInt(b.completedBlockCount) + " 个区块" + (state.selectedBar < 0 ? "（最新一小时）" : "");
+}
+
+function selectBar(i) {
+  const st = state.settlements;
+  if (!st || !st.buckets.length) return;
+  const n = st.buckets.length;
+  const next = Math.max(0, Math.min(n - 1, i));
+  if (next === state.selectedBar) return;
+  state.selectedBar = next;
+  drawChart();
+}
+
+chart.addEventListener("pointermove", (ev) => {
+  if (!chartGeom.n) return;
+  const rect = chart.getBoundingClientRect();
+  const i = Math.floor((ev.clientX - rect.left - chartGeom.left) / chartGeom.barW);
+  if (i >= 0 && i < chartGeom.n) selectBar(i);
+});
+chart.addEventListener("pointerleave", () => {
+  if (document.activeElement === chart) return;
+  state.selectedBar = -1;
+  drawChart();
+});
+chart.addEventListener("keydown", (ev) => {
+  const st = state.settlements;
+  if (!st) return;
+  const n = st.buckets.length;
+  const cur = state.selectedBar >= 0 ? state.selectedBar : n - 1;
+  if (ev.key === "ArrowLeft") { ev.preventDefault(); selectBar(cur - 1); }
+  else if (ev.key === "ArrowRight") { ev.preventDefault(); selectBar(cur + 1); }
+  else if (ev.key === "Home") { ev.preventDefault(); selectBar(0); }
+  else if (ev.key === "End") { ev.preventDefault(); selectBar(n - 1); }
+});
+chart.addEventListener("blur", () => { state.selectedBar = -1; drawChart(); });
+
+/** 一直没拿到某个接口的数据时，把「…」占位换成明确的空状态，避免看起来还在加载。 */
+function renderMissing() {
+  if (!state.failed) return;
+  if (!state.status) {
+    ["block-height", "block-pct", "work-total", "rpm", "core-status", "speed"].forEach((id) => { $(id).textContent = "-"; });
+  }
+  if (!state.economy) { $("sqk-minted").textContent = "-"; $("round").textContent = "-"; }
+  if (!state.settlements) {
+    ["race-note", "chart-total", "settle-count"].forEach((id) => { $(id).textContent = "暂无数据"; });
+    $("board").innerHTML = '<tr><td colspan="4" class="empty">拿到 24 小时数据后显示名次</td></tr>';
+    $("settle-list").innerHTML = '<li class="empty">拿到结算数据后列在这里</li>';
+  }
+}
+
+/* ---------- 顶部状态 ---------- */
+function renderLive() {
+  const live = $("live");
+  if (state.failed) {
+    live.setAttribute("data-state", "offline");
+    $("live-label").textContent = "离线";
+  } else if (state.lastSuccess !== null) {
+    live.setAttribute("data-state", "live");
+    $("live-label").textContent = "LIVE";
+  }
+  $("updated").textContent = state.lastSuccess === null ? "尚未拿到数据" : "更新于 " + ago(state.lastSuccess);
+}
+
+function setAlert(on) {
+  const el = $("alert");
+  const text = on ? FAIL_TEXT : "";
+  if (el.textContent !== text) el.textContent = text;
+}
+
+/* ---------- 刷新循环 ---------- */
+async function refresh() {
+  if (state.inFlight) return;
+  state.inFlight = true;
+  clearTimeout(state.timer);
+  const btn = $("refresh");
+  btn.setAttribute("aria-busy", "true");
+  btn.textContent = "刷新中";
+
+  const results = await Promise.allSettled([
+    getJson(ENDPOINTS.status),
+    getJson(ENDPOINTS.settlements),
+    getJson(ENDPOINTS.economy),
+  ]);
+  const [rs, rset, re] = results;
+  // 每个接口单独解析；任何一个失败都显示降级提示，已有的数字保持上一次的值
+  try { if (rs.status === "fulfilled") state.status = parseStatus(rs.value); } catch (_) { /* 保留旧值 */ }
+  try { if (rset.status === "fulfilled") state.settlements = parseSettlements(rset.value); } catch (_) { /* 保留旧值 */ }
+  try { if (re.status === "fulfilled") state.economy = parseEconomy(re.value); } catch (_) { /* 保留旧值 */ }
+  const ok = results.every((r) => r.status === "fulfilled");
+  state.failed = !ok;
+  if (ok) state.lastSuccess = Date.now();
+  state.refreshCount += 1;
+
+  setAlert(!ok);
+  renderStatus();
+  renderEconomy();
+  renderRace();
+  renderSettlements();
+  if (!state.settlements) drawChart();
+  renderMissing();
+  renderLive();
+
+  btn.removeAttribute("aria-busy");
+  btn.textContent = "立即刷新";
+  state.inFlight = false;
+  state.timer = window.setTimeout(refresh, REFRESH_MS);
+}
+
+$("refresh").addEventListener("click", () => { refresh(); });
+window.addEventListener("offline", () => { state.failed = true; setAlert(true); renderLive(); });
+window.addEventListener("online", () => { refresh(); });
+
+let resizeFrame = 0;
+new ResizeObserver(() => {
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => { positionRunners(); drawChart(); });
+}).observe(document.body);
+
+buildTrack();
+drawChart();
+refresh();
+</script>
+</body>
+</html>

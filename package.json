@@ -1,0 +1,18 @@
+{
+  "name": "squeek-race",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Squeek Race: Squeekchain 链上算力实时仓鼠赛跑，单文件静态页面。",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "node scripts/typecheck.mjs",
+    "test": "node tests/smoke.mjs",
+    "preview": "node scripts/preview.mjs",
+    "check": "npm run typecheck && npm run build && npm test"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.0",
+    "typescript": "^5.9.0"
+  }
+}
