@@ -458,32 +458,49 @@ async function getJson(url) {
 
 /* ---------- 解析：每个字段写清楚来自哪个接口、哪个路径 ---------- */
 
+/** 必填非负数；不把 null、布尔值、空字符串或对象强转成 0。 */
+function requiredNumber(value, path, integer = false) {
+  const n = (typeof value === "number" || (typeof value === "string" && value.trim() !== "")) ? toNum(value) : null;
+  if (n === null || n < 0 || (integer && !Number.isInteger(n))) throw new Error("Invalid " + path);
+  return n;
+}
+
+/** 必填非负整数；大整数用字符串传输，禁止把小数或不安全的 number 截断。 */
+function requiredInteger(value, path) {
+  const n = toBig(value);
+  if (n === null || n < 0n || (typeof value === "number" && !Number.isSafeInteger(value))) throw new Error("Invalid " + path);
+  return n;
+}
+
 /** /v1/status */
 function parseStatus(raw) {
   const m = (raw && raw.measurement) || {};
   const anchor = (raw && raw.builder && raw.builder.anchor) || {};
+  const blockProgress = requiredNumber(anchor.blockProgress, "builder.anchor.blockProgress", true);
+  if (blockProgress > 1e9) throw new Error("Invalid builder.anchor.blockProgress");
+  if (m.coreStatus !== "SPINNING" && m.coreStatus !== "IDLE") throw new Error("Invalid measurement.coreStatus");
   return {
     // /v1/status → measurement.cumulativeWorkUnits：累计 work（大整数字符串）
-    cumulativeWork: toBig(m.cumulativeWorkUnits),
+    cumulativeWork: requiredInteger(m.cumulativeWorkUnits, "measurement.cumulativeWorkUnits"),
     // /v1/status → measurement.rpmMilli：转速，千分之一 rpm
-    rpm: toNum(m.rpmMilli) === null ? null : /** @type {number} */ (toNum(m.rpmMilli)) / 1000,
+    rpm: requiredNumber(m.rpmMilli, "measurement.rpmMilli") / 1000,
     // /v1/status → measurement.speedMmPerSecond：线速度 mm/s
-    speed: toNum(m.speedMmPerSecond),
+    speed: requiredNumber(m.speedMmPerSecond, "measurement.speedMmPerSecond"),
     // /v1/status → measurement.coreStatus：SPINNING / IDLE
-    coreStatus: typeof m.coreStatus === "string" ? m.coreStatus : null,
+    coreStatus: m.coreStatus,
     // /v1/status → measurement.receivedAt：最近一次测量被接受的时间（可选）
     receivedAt: toMs(m.receivedAt),
     // /v1/status → builder.anchor.blockHeight：当前区块高度
-    blockHeight: toBig(anchor.blockHeight),
+    blockHeight: requiredInteger(anchor.blockHeight, "builder.anchor.blockHeight"),
     // /v1/status → builder.anchor.blockProgress：当前区块完成度，0 ~ 1e9
-    blockProgress: toNum(anchor.blockProgress),
+    blockProgress,
   };
 }
 
-/** 一个小时桶的开始时间：接口没有固定字段名时依次尝试常见写法。 */
+/** /v1/settlements?range=24h → buckets[].startAt；旧字段名仅用于兼容。 */
 function bucketTime(b) {
   if (!b || typeof b !== "object") return null;
-  const keys = ["startsAt", "start", "bucketStart", "startTime", "hourStart", "from", "timestamp", "time", "at", "hour"];
+  const keys = ["startAt", "startsAt", "start", "bucketStart", "startTime", "hourStart", "from", "timestamp", "time", "at", "hour"];
   for (const k of keys) {
     const t = toMs(b[k]);
     if (t !== null && t > 1e11) return t;
@@ -494,48 +511,54 @@ function bucketTime(b) {
 /** /v1/settlements?range=24h */
 function parseSettlements(raw) {
   // /v1/settlements → buckets[]：24 个小时桶
-  const rawBuckets = Array.isArray(raw && raw.buckets) ? raw.buckets : [];
+  if (!Array.isArray(raw && raw.buckets)) throw new Error("Invalid buckets");
+  const rawBuckets = raw.buckets;
   let buckets = rawBuckets.map((b, i) => ({
     index: i,
     time: bucketTime(b),
     // buckets[].workAdded：该小时新增 work
-    workAdded: toNum(b && b.workAdded) || 0,
+    workAdded: requiredNumber(b && b.workAdded, "buckets[].workAdded", true),
     // buckets[].settlementCount：该小时结算次数
-    settlementCount: toNum(b && b.settlementCount) || 0,
+    settlementCount: requiredNumber(b && b.settlementCount, "buckets[].settlementCount", true),
     // buckets[].completedBlockCount：该小时完成的区块数
-    completedBlockCount: toNum(b && b.completedBlockCount) || 0,
+    completedBlockCount: requiredNumber(b && b.completedBlockCount, "buckets[].completedBlockCount", true),
   }));
   if (buckets.every((b) => b.time !== null)) {
     buckets.sort((a, b) => /** @type {number} */ (a.time) - /** @type {number} */ (b.time));
   } else {
-    // 没有时间字段时按接口顺序（旧 → 新）推算每个桶的整点时间
+    // 仅缺少时间的桶按接口顺序（旧 → 新）推算；保留已有的源时间
     const hour = 3600000;
     const now = Math.floor(Date.now() / hour) * hour;
-    buckets = buckets.map((b, i) => ({ ...b, time: now - (buckets.length - 1 - i) * hour }));
+    buckets = buckets.map((b, i) => ({ ...b, time: b.time ?? now - (buckets.length - 1 - i) * hour }));
   }
   const summary = (raw && raw.summary) || {};
-  // 接口如果附带逐条结算记录，就用它做「最近结算」；常见字段名依次尝试
-  const listKey = ["settlements", "recent", "items", "events", "latest"].find((k) => Array.isArray(raw && raw[k]));
+  // /v1/settlements → recentSettlements[]：优先显示真实记录；旧字段名仅用于兼容
+  const listKey = ["recentSettlements", "settlements", "recent", "items", "events", "latest"].find((k) => Array.isArray(raw && raw[k]));
   const recent = listKey ? raw[listKey].map(parseSettlementItem).filter(Boolean) : [];
   return {
     buckets,
     // /v1/settlements → summary.settlementCount：24h 结算总次数
-    settlementCount: toNum(summary.settlementCount),
+    settlementCount: requiredNumber(summary.settlementCount, "summary.settlementCount", true),
     // /v1/settlements → summary.workAdded：24h 新增 work 总量
-    workAdded: summary.workAdded,
+    workAdded: requiredInteger(summary.workAdded, "summary.workAdded"),
     recent,
   };
 }
 
-/** /v1/settlements 逐条记录（可选字段）。 */
+/** /v1/settlements?range=24h → recentSettlements[] 逐条记录；保留旧字段兼容。 */
 function parseSettlementItem(it) {
   if (!it || typeof it !== "object") return null;
-  const time = toMs(it.settledAt ?? it.createdAt ?? it.blockTimestamp ?? it.timestamp ?? it.time ?? it.at);
+  // recentSettlements[].blockTimestamp：结算上链时间
+  const time = toMs(it.blockTimestamp ?? it.settledAt ?? it.createdAt ?? it.timestamp ?? it.time ?? it.at);
   return {
     time,
+    // recentSettlements[].workAdded：本次结算新增 work
     work: it.workAdded ?? it.work ?? it.workUnits ?? null,
+    // recentSettlements[].settledThroughRound：本次结算处理到的轮次
     round: it.settledThroughRound ?? it.round ?? it.roundId ?? null,
+    // recentSettlements[].completedBlockCount：本次结算完成的区块数
     blocks: toNum(it.completedBlockCount ?? it.blocks),
+    // recentSettlements[].transactionHash：交易哈希（当前仅解析，不发送交易）
     tx: typeof (it.transactionHash ?? it.txHash) === "string" ? (it.transactionHash ?? it.txHash) : null,
   };
 }
@@ -546,9 +569,9 @@ function parseEconomy(raw) {
   const mining = (raw && raw.mining) || {};
   return {
     // /v1/economy/state → supply.totalMintedBaseUnits：已铸造总量，18 位小数
-    totalMinted: toBig(supply.totalMintedBaseUnits),
+    totalMinted: requiredInteger(supply.totalMintedBaseUnits, "supply.totalMintedBaseUnits"),
     // /v1/economy/state → mining.processedThroughRound：已处理到的轮次
-    processedThroughRound: mining.processedThroughRound ?? null,
+    processedThroughRound: requiredInteger(mining.processedThroughRound, "mining.processedThroughRound"),
   };
 }
 
@@ -636,12 +659,12 @@ function renderStatus() {
   if (!s) return;
   $("block-height").textContent = s.blockHeight === null ? "-" : "#" + fmtInt(s.blockHeight);
   if (s.blockProgress !== null) {
-    // blockProgress / 1e9 = 完成比例；百分比保留两位小数（向下取整，避免提前显示 100%）
+    // /v1/status → builder.anchor.blockProgress / 1e9 = 比例；整数百分比与 sepolia 首页一致
     const ratio = Math.min(1, Math.max(0, s.blockProgress / 1e9));
-    const pct = Math.floor(ratio * 10000) / 100;
-    $("block-pct").textContent = pct.toFixed(2) + "%";
+    const pct = Math.floor(ratio * 100);
+    $("block-pct").textContent = pct + "%";
     $("block-fill").style.transform = "scaleX(" + ratio + ")";
-    $("block-progress").setAttribute("aria-valuenow", pct.toFixed(2));
+    $("block-progress").setAttribute("aria-valuenow", String(pct));
   } else {
     $("block-pct").textContent = "-";
   }
@@ -751,7 +774,7 @@ function renderSettlements() {
       .map((it) => '<li>' +
         '<span class="settle-main num">' + (it.round !== null ? "结算到第 " + fmtInt(it.round) + " 轮" : "结算") + '</span>' +
         '<span class="settle-time">' + ago(it.time) + '</span>' +
-        '<span class="settle-sub num">' + (it.work !== null ? "+" + fmtInt(it.work) + " work" : "") + (it.blocks ? " · " + fmtInt(it.blocks) + " 个区块" : "") + '</span>' +
+        '<span class="settle-sub num">' + (it.work !== null ? "+" + fmtInt(it.work) + " work" : "") + (it.blocks !== null ? " · " + fmtInt(it.blocks) + " 个区块" : "") + '</span>' +
       '</li>');
   } else {
     // 接口没有逐条记录时，列出有结算的小时桶（新 → 旧）
@@ -798,6 +821,8 @@ function drawChart() {
   ctx.font = "12px " + cssVar("--font-sans");
 
   if (!st || !st.buckets.length) {
+    chartGeom = { left: 0, width: 0, barW: 0, n: 0 };
+    updateCaption();
     ctx.fillStyle = text2;
     ctx.textAlign = "center";
     ctx.fillText(st || state.failed ? "暂无数据" : "正在拉取数据", w / 2, h / 2);
@@ -953,24 +978,28 @@ async function refresh() {
   btn.textContent = "刷新中";
 
   const results = await Promise.allSettled([
-    getJson(ENDPOINTS.status),
-    getJson(ENDPOINTS.settlements),
-    getJson(ENDPOINTS.economy),
+    getJson(ENDPOINTS.status).then(parseStatus),
+    getJson(ENDPOINTS.settlements).then(parseSettlements),
+    getJson(ENDPOINTS.economy).then(parseEconomy),
   ]);
   const [rs, rset, re] = results;
-  // 每个接口单独解析；任何一个失败都显示降级提示，已有的数字保持上一次的值
-  try { if (rs.status === "fulfilled") state.status = parseStatus(rs.value); } catch (_) { /* 保留旧值 */ }
-  try { if (rset.status === "fulfilled") state.settlements = parseSettlements(rset.value); } catch (_) { /* 保留旧值 */ }
-  try { if (re.status === "fulfilled") state.economy = parseEconomy(re.value); } catch (_) { /* 保留旧值 */ }
+  // 请求和字段校验都成功后才替换对应缓存；HTTP 200 的无效 JSON 数据也算失败
+  if (rs.status === "fulfilled") state.status = rs.value;
+  if (rset.status === "fulfilled") {
+    state.settlements = rset.value;
+    if (state.selectedBar >= rset.value.buckets.length) state.selectedBar = -1;
+    state.refreshCount += 1;
+  }
+  if (re.status === "fulfilled") state.economy = re.value;
   const ok = results.every((r) => r.status === "fulfilled");
   state.failed = !ok;
   if (ok) state.lastSuccess = Date.now();
-  state.refreshCount += 1;
 
   setAlert(!ok);
   renderStatus();
   renderEconomy();
-  renderRace();
+  if (rset.status === "fulfilled") renderRace();
+  else positionRunners();
   renderSettlements();
   if (!state.settlements) drawChart();
   renderMissing();

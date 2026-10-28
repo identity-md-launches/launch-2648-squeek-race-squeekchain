@@ -88,15 +88,15 @@ No surface has both a border and a shadow.
 | Card `.card` | `index.html:114` | White surface, 1px border, 14px radius, 16px padding. Header row `.card-head` holds an `h2` plus a `.card-note` on the trailing side |
 | LIVE badge `.live` | `index.html:91-95` | `data-state="loading"\|"live"\|"offline"`. The dot is red and pulses only when live, under `prefers-reduced-motion: no-preference`. The label text changes too (`连接中` / `LIVE` / `离线`), so colour is not the only cue |
 | Refresh button `.refresh` | `index.html:96-104` | Native `<button>`, 44px tall pill. Hover fill is gated by `(hover: hover)`, press scales to 0.96, and while a request runs it shows `aria-busy="true"` and the label `刷新中` |
-| Alert `.alert` | `index.html:107` | Stable `role="alert"` element, hidden when empty. Shows exactly `数据拉取失败，10 秒后重试` when any endpoint fails |
-| Progress `.progress` | `index.html:127-128` | `role="progressbar"` with `aria-valuenow`. The fill is `scaleX(ratio)` with a 600ms ease-out transition |
+| Alert `.alert` | `index.html:107` | Stable `role="alert"` element, hidden when empty. Shows exactly `数据拉取失败，10 秒后重试` when a request or required-field validation fails; keeps that endpoint's last valid data |
+| Progress `.progress` | `index.html:127-128`, `renderStatus` `index.html:657` | Visible percentage and `aria-valuenow` use the floored integer percentage, matching the reference homepage. The fill retains the precise `scaleX(ratio)` with a 600ms ease-out transition |
 | Wheel `.wheel` | `index.html:134-140` | SVG. `data-spinning` toggles a linear `spin` animation; `--spin-duration` = 60 / rpm seconds, clamped to 0.4–20s |
 | Race lane `.lane` / `.runner` | `index.html:154-171` | Grid of name plus track. The runner moves by `transform: translateX(var(--x))` with a 1200ms `cubic-bezier(0.2, 0, 0, 1)` transition and hops only while the core is SPINNING and motion is allowed. Each lane carries an `aria-label` with work and share |
 | Leaderboard `.board-table` | `index.html:175-187` | Native table: 名次 / 跑者 / work / 增速. `.rank-1..3` are medal badges. A rank change shows as text (`上升 n 名` / `下降 n 名`) |
-| Chart | `index.html:191-194`, `drawChart` `index.html:780` | Hand-drawn DPR-aware canvas: three grid lines, 24 bars, the latest bar in `--color-accent-strong`, and hour labels every 6 hours clamped inside the canvas. Pointer hover or the Left/Right/Home/End keys select an hour; `#chart-caption` (`aria-live="polite"`) states the values |
-| Settlement row `.settle-list li` | `index.html:198-203` | Two-column grid: title and time on the first line, work and blocks on the second |
+| Chart | `index.html:191-194`, `drawChart` `index.html:803` | Hand-drawn DPR-aware canvas: three grid lines, 24 bars, the latest bar in `--color-accent-strong`, and hour labels every 6 hours clamped inside the canvas. Hours come from `buckets[].startAt`. Pointer hover or Left/Right/Home/End selects an hour; `#chart-caption` (`aria-live="polite"`) states its values. Valid empty data clears the old caption and geometry; failed data preserves the chart |
+| Settlement row `.settle-list li` | `index.html:198-203`, `renderSettlements` `index.html:758` | Two-column grid: round and relative time on the first line, work and completed blocks (including zero) on the second. Prefers real `recentSettlements` records, newest first, up to six rows; hourly aggregates are only a fallback when records are absent |
 | Facts `.facts` | `index.html:205-207` | `dl` with two columns: minted SQK and processed round |
-| Empty states `.empty` | `renderMissing` `index.html:914` | When an endpoint never answered, the `…` placeholders turn into `-` or `暂无数据`, and the lists say what will appear once data arrives |
+| Empty states `.empty` | `renderMissing` `index.html:939` | When an endpoint has never returned valid data, the `…` placeholders turn into `-` or `暂无数据`, and lists say what will appear once data arrives. An invalid response is distinct from a valid zero-activity response |
 
 ## Motion
 

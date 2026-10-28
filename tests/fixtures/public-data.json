@@ -1,0 +1,241 @@
+{
+  "_source": "Public Squeekchain GET responses captured 2026-10-28; only fields consumed by Squeek Race retained.",
+  "status": {
+    "measurement": {
+      "cumulativeWorkUnits": "22073",
+      "rpmMilli": 0,
+      "speedMmPerSecond": 0,
+      "coreStatus": "IDLE",
+      "receivedAt": "2026-10-28T20:01:58.227Z"
+    },
+    "builder": {
+      "anchor": {
+        "blockHeight": "2027",
+        "blockProgress": "753319164"
+      }
+    }
+  },
+  "settlements": {
+    "generatedAt": "2026-10-28T20:02:02.291Z",
+    "buckets": [
+      {
+        "startAt": "2026-10-27T21:00:00.000Z",
+        "workAdded": "714",
+        "settlementCount": "4",
+        "completedBlockCount": "66"
+      },
+      {
+        "startAt": "2026-10-27T22:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "0",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-27T23:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "0",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T00:00:00.000Z",
+        "workAdded": "3468",
+        "settlementCount": "5",
+        "completedBlockCount": "320"
+      },
+      {
+        "startAt": "2026-10-28T01:00:00.000Z",
+        "workAdded": "3219",
+        "settlementCount": "6",
+        "completedBlockCount": "287"
+      },
+      {
+        "startAt": "2026-10-28T02:00:00.000Z",
+        "workAdded": "1984",
+        "settlementCount": "6",
+        "completedBlockCount": "176"
+      },
+      {
+        "startAt": "2026-10-28T03:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T04:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T05:00:00.000Z",
+        "workAdded": "302",
+        "settlementCount": "6",
+        "completedBlockCount": "26"
+      },
+      {
+        "startAt": "2026-10-28T06:00:00.000Z",
+        "workAdded": "1204",
+        "settlementCount": "6",
+        "completedBlockCount": "105"
+      },
+      {
+        "startAt": "2026-10-28T07:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T08:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T09:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T10:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T11:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T12:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T13:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T14:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T15:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T16:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T17:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T18:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T19:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "6",
+        "completedBlockCount": "0"
+      },
+      {
+        "startAt": "2026-10-28T20:00:00.000Z",
+        "workAdded": "0",
+        "settlementCount": "0",
+        "completedBlockCount": "0"
+      }
+    ],
+    "summary": {
+      "settlementCount": "123",
+      "workAdded": "10891"
+    },
+    "recentSettlements": [
+      {
+        "settledThroughRound": "243",
+        "workAdded": "70",
+        "completedBlockCount": "6",
+        "blockTimestamp": "2026-10-28T06:20:36.000Z"
+      },
+      {
+        "settledThroughRound": "242",
+        "workAdded": "538",
+        "completedBlockCount": "47",
+        "blockTimestamp": "2026-10-28T06:10:36.000Z"
+      },
+      {
+        "settledThroughRound": "241",
+        "workAdded": "596",
+        "completedBlockCount": "52",
+        "blockTimestamp": "2026-10-28T06:00:36.000Z"
+      },
+      {
+        "settledThroughRound": "240",
+        "workAdded": "302",
+        "completedBlockCount": "26",
+        "blockTimestamp": "2026-10-28T05:50:36.000Z"
+      },
+      {
+        "settledThroughRound": "222",
+        "workAdded": "604",
+        "completedBlockCount": "53",
+        "blockTimestamp": "2026-10-28T02:50:36.000Z"
+      },
+      {
+        "settledThroughRound": "221",
+        "workAdded": "670",
+        "completedBlockCount": "60",
+        "blockTimestamp": "2026-10-28T02:40:48.000Z"
+      },
+      {
+        "settledThroughRound": "220",
+        "workAdded": "92",
+        "completedBlockCount": "8",
+        "blockTimestamp": "2026-10-28T02:30:36.000Z"
+      },
+      {
+        "settledThroughRound": "217",
+        "workAdded": "618",
+        "completedBlockCount": "55",
+        "blockTimestamp": "2026-10-28T02:00:36.000Z"
+      },
+      {
+        "settledThroughRound": "216",
+        "workAdded": "367",
+        "completedBlockCount": "32",
+        "blockTimestamp": "2026-10-28T01:50:36.000Z"
+      },
+      {
+        "settledThroughRound": "215",
+        "workAdded": "517",
+        "completedBlockCount": "45",
+        "blockTimestamp": "2026-10-28T01:40:48.000Z"
+      }
+    ]
+  },
+  "economy": {
+    "supply": {
+      "totalMintedBaseUnits": "8066546793063427114304839"
+    },
+    "mining": {
+      "processedThroughRound": "324"
+    }
+  }
+}

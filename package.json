@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "node scripts/typecheck.mjs",
-    "test": "node tests/smoke.mjs",
+    "test": "node tests/smoke.mjs && node tests/regressions.mjs",
     "preview": "node scripts/preview.mjs",
     "check": "npm run typecheck && npm run build && npm test"
   },

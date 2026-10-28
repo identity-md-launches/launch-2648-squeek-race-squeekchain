@@ -21,19 +21,23 @@
 | 同上 | `measurement.coreStatus` | `SPINNING` 显示「转轮转动中」并让转轮转动，`IDLE` 显示「转轮空闲」并停转 |
 | 同上 | `measurement.receivedAt`（可选） | 「测量于 x 分钟前」 |
 | 同上 | `builder.anchor.blockHeight` | 当前区块号 |
-| 同上 | `builder.anchor.blockProgress` | 0–1e9；÷ 1e9 得到比例，百分比保留两位小数（向下取整） |
+| 同上 | `builder.anchor.blockProgress` | 0–1e9；÷ 1e9 得到比例，显示 `Math.floor(比例 × 100)` 的整数百分比，与参考首页一致；进度条保留精确比例 |
 | `GET https://api.squeekchain.com/v1/settlements?range=24h` | `buckets[].workAdded` | 柱状图；按随机权重拆给跑者 |
+| 同上 | `buckets[].startAt` | 小时桶的源时间；缓存跨小时仍保持原来的标签和相对时间 |
 | 同上 | `buckets[].settlementCount`、`buckets[].completedBlockCount` | 柱状图说明、最近结算列表 |
 | 同上 | `summary.settlementCount`、`summary.workAdded` | 24 小时合计 |
+| 同上 | `recentSettlements[].settledThroughRound`、`workAdded`、`completedBlockCount`、`blockTimestamp` | 最近逐条结算的轮次、新增 work、完成区块数和相对时间；按时间倒序显示最近 6 条 |
 | `GET https://api.squeekchain.com/v1/economy/state` | `supply.totalMintedBaseUnits` ÷ 1e18 | 已铸造 SQK（BigInt 计算，两位小数） |
 | 同上 | `mining.processedThroughRound` | 已处理轮次 |
 
 每个字段在 `index.html` 的解析函数 `parseStatus` / `parseSettlements` / `parseEconomy` 里都有注释写明来源接口和路径。
 
-关于接口形状的两点假设（brief 没有给出，代码按以下方式容错）：
+接口兼容与失败处理：
 
-- 小时桶的时间字段名没有写明，代码依次尝试 `startsAt`、`start`、`bucketStart`、`startTime`、`hourStart`、`from`、`timestamp`、`time`、`at`、`hour`；都没有时按数组顺序（旧到新）推算整点。
-- 如果 `settlements` 响应带有逐条记录（`settlements` / `recent` / `items` / `events` / `latest` 数组），「最近结算」列出这些记录；否则列出有结算的小时桶（时段、次数、新增 work、完成区块数）。
+- 小时桶优先读取真实接口的 `startAt`，再尝试旧别名 `startsAt`、`start`、`bucketStart`、`startTime`、`hourStart`、`from`、`timestamp`、`time`、`at`、`hour`；没有可用时间时只推算缺失的桶，不覆盖已有源时间。
+- 「最近结算」优先读取真实接口的 `recentSettlements`，兼容 `settlements` / `recent` / `items` / `events` / `latest` 数组。只有没有逐条记录时才列出有结算的小时桶。
+- 三个接口的必填数值、计数、状态枚举和区块进度范围先通过校验，再分别更新缓存。HTTP 200 但返回 `{}`、缺字段或错误类型，也会显示「数据拉取失败，10 秒后重试」，保留该接口上次的数字、榜单和图表。其他有效接口可以独立更新。
+- `buckets: []` 配合有效的零值 summary 是合法空数据，会清除旧图表说明和选择状态；缺少 `buckets` 则是失败，不能当成没有活动。
 
 ### 跑者怎么分 work
 
@@ -49,7 +53,7 @@
 用本地静态服务器预览构建产物：
 
 ```bash
-npm install          # 只装开发工具：typescript（类型检查）和 playwright（交互测试）
+npm ci               # 按锁文件安装开发工具：typescript（类型检查）和 playwright（交互测试）
 npm run build        # 生成 dist/
 npm run preview      # http://localhost:4173/
 ```
@@ -60,7 +64,7 @@ npm run preview      # http://localhost:4173/
 | --- | --- |
 | `npm run build` | `scripts/build.mjs`：把 `index.html` 和 `og-image.png` 复制到 `dist/`，并检查所有 URL 都是相对路径、引用的文件都在 |
 | `npm run typecheck` | `scripts/typecheck.mjs`：抽出 `index.html` 的内联脚本，用 `tsc --noEmit --checkJs` 检查（报错行号与 `index.html` 对齐） |
-| `npm test` | `tests/smoke.mjs`：用 Playwright（Chromium）打开 `dist/`，三个接口用固定数据代答，检查交互、布局和失败状态 |
+| `npm test` | Playwright（Chromium）打开 `dist/`，执行原有交互检查与 `tests/regressions.mjs` 的四项反馈回归；真实接口裁剪样本在 `tests/fixtures/public-data.json` |
 | `npm run check` | 依次执行以上三步 |
 
 `npm test` 需要 Playwright 的 Chromium（`npx playwright install chromium`）。
@@ -81,15 +85,14 @@ npm run preview      # http://localhost:4173/
 | --- | --- |
 | `npm run typecheck` | 通过 |
 | `npm run build` | 通过，`dist/` 写入 `index.html`、`og-image.png` |
-| `npm test`（Chromium 1248，Playwright 1.64.1） | 22/22 项通过 |
+| `npm test`（Chromium 1248，Playwright 1.64.1） | 原有交互 22/22、新增回归 16/16 项通过；包括 17 种必填字段异常 |
 | design-critic taste@1 探针（320 / 390 / 1440） | 16/16 项通过 |
+| 真实接口与参考首页对照 | 三个 GET 返回 200；最近结算显示第 243 轮、+70 work、6 个区块；进度 `753319164` 显示 `75%`，与参考首页一致 |
 
 已知限制：
 
-- 本机访问 `api.squeekchain.com` 和 `sepolia.squeekchain.com` 都被 Cloudflare 质询页拦下（HTTP 403 “Just a moment...”），
-  所以没能用真实接口跑页面，也没能和 sepolia.squeekchain.com 首页的百分比做实际对照。百分比的算法按 brief 实现
-  （`blockProgress / 1e9`，两位小数，向下取整），测试用固定数据验证。
-- WebKit（Safari）在本机缺系统库，无法启动，没有测。没有做读屏软件和真机测试。
+- 真实接口会持续变化，也可能暂时请求失败；可重复回归使用公开响应的裁剪样本，不把样本作为页面运行时兜底数据。
+- WebKit（Safari）启动检查仍因缺少系统库而失败，未完成 Safari 行为验证。没有做读屏软件和真机测试。
 
 ## 目录
 
@@ -98,9 +101,9 @@ index.html          应用本体（源文件，单文件）
 og-image.png        分享卡片图片
 dist/               构建产物（提交到仓库）
 scripts/            build / typecheck / preview 脚本
-tests/smoke.mjs     Playwright 交互测试
+tests/              原有交互测试、反馈回归测试及公开响应裁剪样本
 DESIGN.md           设计系统说明
 artifacts/validation.md  设计审查与验证记录
 ```
 
-`.gitignore` 只忽略 `node_modules/`、`.typecheck/`（类型检查的临时文件）和 `test/scratch/`。提交内容预算：除 `package-lock.json` 外全部文件合计小于 200 KB，远低于 8 MiB 上限。
+`.gitignore` 保持原样，忽略 `node_modules/`、`.typecheck/`（类型检查的临时文件）和 `test/scratch/`。开发依赖和缓存不属于交付内容；最终文件体积检查见验证记录，低于 8 MiB 上限。

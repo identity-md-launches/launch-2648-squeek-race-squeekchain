@@ -22,7 +22,7 @@ function statusFixture() {
 }
 const now = Math.floor(Date.now() / HOUR) * HOUR;
 const buckets = Array.from({ length: 24 }, (_, i) => ({
-  startsAt: new Date(now - (23 - i) * HOUR).toISOString(),
+  startAt: new Date(now - (23 - i) * HOUR).toISOString(),
   workAdded: String(40000 + ((i * 7919) % 31) * 1500),
   settlementCount: i % 3 === 0 ? 2 : 0,
   completedBlockCount: i % 4 === 0 ? 1 : 0,
@@ -78,8 +78,8 @@ try {
     const ids = ["block-height", "block-pct", "work-total", "rpm", "speed", "sqk-minted", "round", "chart-total", "settle-count", "race-note"];
     const texts = await page.evaluate((ids) => ids.map((id) => document.getElementById(id).textContent), ids);
     check("every stat has a numeric value", texts.every((t) => /\d/.test(t)), texts.join(" | "));
-    const expectedPct = (Math.floor((progress / 1e9) * 10000) / 100).toFixed(2) + "%";
-    check("block progress = blockProgress / 1e9", texts[1] === expectedPct, `${texts[1]} vs ${expectedPct}`);
+    // Reference homepage displays a floored integer, while the bar keeps its precise ratio.
+    check("block progress uses the reference homepage's integer precision", texts[1] === "63%", `${texts[1]} vs 63%`);
     check("thousands separators", texts[2] === "123,456,789,012" && texts[5] === "5,603,205.66", `${texts[2]} / ${texts[5]}`);
     const live = await page.textContent("#live-label");
     check("LIVE light on", live === "LIVE");
@@ -109,7 +109,7 @@ try {
     progress = 912345678;
     buckets[23].workAdded = String(Number(buckets[23].workAdded) + 250000);
     await page.click("#refresh");
-    await page.waitForFunction(() => document.getElementById("block-pct").textContent === "91.23%", null, { timeout: 10000 });
+    await page.waitForFunction(() => document.getElementById("block-pct").textContent === "91%", null, { timeout: 10000 });
     const xs2 = await page.$$eval(".runner", (els) => els.map((e) => e.style.getPropertyValue("--x")));
     check("refresh button updates values and moves runners", xs2.join() !== xs1.join(), xs2.join(","));
     check("session work delta shown", (await page.textContent("#work-delta")).includes("98,765"));
